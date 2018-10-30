@@ -5,6 +5,9 @@
 - generate dropoffs
 - exit for new ships; when there are too many ships in radius 2 then mark a corridor as unsafe and move new ships through it by move_unsafe
 - entity 13 was directed to use 2 halite to move north, but only 1 halite was available
+- exloration area per dropoff: just calculate for every one with different radius and add the list
+- blockade shipyard of other players and defete own
+- movement over edges! On onter side of map edge distance is calculated wrong because shortest is in both ways?
 
 """
 import hlt
@@ -100,14 +103,14 @@ class Shipping():
 
     def return_to_base_or_drop(self):
 
-        next_position = self.ship.position
+        next_dropoff_position, all_dropoff_positions = self.get_next_dropoff_position(self.ship)
 
-        if self.ship.position == self.me.shipyard.position and self.ship.halite_amount > 0:   # do dropoff
+        if self.ship.position == next_dropoff_position and self.ship.halite_amount > 0:   # do dropoff
             cmd = self.ship.make_dropoff()
+            next_position = self.ship.position
             logging.info("Ship {} dropping halite.".format(ship.id))
 
         else:   # move towards dropoff
-            next_dropoff_position, all_dropoff_positions = self.get_next_dropoff_position(self.ship)
             min_dist_dropoff = all_dropoff_positions[np.array([game_map.calculate_distance(self.ship.position, pos) for pos in all_dropoff_positions]).argmin()]
             shipyard_available_for_next_move = min_dist_dropoff in [position for position in self.ship.position.get_surrounding_cardinals()]
             if False: #self.ship in self.ships_that_can_reach_shipyard: #shipyard_available_for_next_move: # avoid Torschusspanik
@@ -247,10 +250,10 @@ class Shipping():
 
                     # schiff mit letzter ID
                     #elif self.exploration_radius > self.create_dropoff_distance and min_dist_dropoff > self.create_dropoff_distance and me.halite_amount >= constants.DROPOFF_COST and self.ship.id == [ship.id for ship in self.me.get_ships()][-1]:
-                    ### create dropoffs
-                    cmd = self.ship.make_dropoff()
-                    next_position = self.ship.position
-                    return cmd, next_position
+                            ### create dropoffs
+                            cmd = self.ship.make_dropoff()
+                            next_position = self.ship.position
+                            return cmd, next_position
 
                 else: # move to good position
                     # could also decide to set status to 'go_far' if next_position_radius1_max_halite is less than another threshold like 250 such that the ship moves faster to rentable hilite positions
@@ -453,11 +456,12 @@ def get_all_next_dropoff_position(ship_tmp):
 
 ### constants ###
 THRESHOLDS = {}
-THRESHOLDS['turn_number_up_to_create_ships'] = 250
-THRESHOLDS['turn_number_start_to_save_for_dropoff'] = 200
+THRESHOLDS['turn_number_up_to_create_ships'] = 300
+THRESHOLDS['turn_number_start_to_save_for_dropoff'] = 190
 THRESHOLDS['halite_threshold_to_stay'] = 30
 THRESHOLDS['halite_threshold_to_return'] = 995
 THRESHOLDS['create_dropoff_distance'] = 3
+THRESHOLDS['turns_to_create_dropoffs'] = [230, 300]#, 350, 400]
 
 ### player and map ###
 me = game.me
@@ -502,7 +506,7 @@ while True:
 
         #print(type(my_ships.values[0][0]))
 
-        if game.turn_number == 230 or game.turn_number == 270 or game.turn_number == 300:
+        if game.turn_number in THRESHOLDS['turns_to_create_dropoffs']:
             n_new_dropoffs = np.floor(me.halite_amount / 4000)
             if n_new_dropoffs > 0:
                 for i in range(int(min(n_new_dropoffs, 1))):
@@ -544,7 +548,7 @@ while True:
             #        print('shipyard pos', me.shipyard.position)
             #        print(game_map.naive_navigate(ship, me.shipyard.position))
             #        print(game_map.get_unsafe_moves(ship.position, me.shipyard.position))
-            #print('#######', game_map[me.shipyard.position].is_occupied)
+                #print('#######', game_map[me.shipyard.position].is_occupied)
 
             ships[ship.id]['shipping'].update_for_next_trun(ship,
                                                             me,
@@ -584,8 +588,8 @@ while True:
     # create ships
     if game.turn_number <= THRESHOLDS['turn_number_start_to_save_for_dropoff']:
         if game.turn_number <= THRESHOLDS['turn_number_up_to_create_ships'] and me.halite_amount >= constants.SHIP_COST and not shipyard_is_occupied:
-            command_queue.append(game.me.shipyard.spawn())
-            logging.info('##### Ship spawned #####')
+                command_queue.append(game.me.shipyard.spawn())
+                logging.info('##### Ship spawned #####')
 
     # create ships but save some money
     else:

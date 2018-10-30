@@ -20,7 +20,7 @@ import numpy as np
 # This game object contains the initial game state.
 game = hlt.Game()
 # Respond with your name.
-game.ready("Lahr_1")
+game.ready("Lahr_11111")
 
 
 class Shipping():
